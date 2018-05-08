@@ -86,10 +86,15 @@ def read_motionData(frame_count, tracks):
     # evaluate all tracks for all bones
     for track in tracks:
         bone_tracks = evaluated_tracks.setdefault(track.bone_id, [None] * 9)
-        frames = []
-        for i in range(frame_count):
-            frames.append(track.eval(i))
-        bone_tracks[track.type] = frames
+        # print('bone_id:%d' % (track.bone_id))
+        # Some mot file have unknown track type: 14,15
+        if track.type >= 0 and track.type <= 9:
+            frames = []
+            for i in range(frame_count):
+                frames.append(track.eval(i))
+            bone_tracks[track.type] = frames
+        else:
+            print('[Error] Unknown TrackType:%d' % (track.type))
 
     # fill in missing tracks
     default_value = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
@@ -114,7 +119,6 @@ def read_motionData(frame_count, tracks):
             # TODO: need to convert euler angles to quaternion
             x, y, z, w = euler_angle_to_quaternion(rotx, roty, rotz)
             rot_frames.append((i, x, y, z, w))
-            # rot_frames.append((i, rotx, roty, rotz, 1))
             # print(rot_frames)
             scale_frames.append(
                 (i, bone_tracks[6][i], bone_tracks[7][i], bone_tracks[8][i]))
