@@ -2,6 +2,8 @@ import bpy, bmesh, math
 from mathutils import Vector, Matrix
 from nier2blender.wmb import *
 
+ModelName = ''
+
 def reset_blend():
     bpy.ops.object.mode_set(mode='OBJECT')
     for scene in bpy.data.scenes:
@@ -18,7 +20,7 @@ def reset_blend():
         bpy.data.objects.remove(obj)
         obj.user_clear()
 
-def construct_armature(name, bone_data_array):			# bone_data =[boneIndex, boneName, parentIndex, parentName, bone_pos, optional ]
+def construct_armature(name, bone_data_array):			# bone_data =[boneIndex, boneName, parentIndex, parentName, bone_pos, bone_rot, bone_number ]
     print('[+] importing armature')
     bpy.ops.object.add(
         type='ARMATURE', 
@@ -32,16 +34,20 @@ def construct_armature(name, bone_data_array):			# bone_data =[boneIndex, boneNa
 
     amt = ob.data
     amt.name = name +'Amt'
-    for bone_data in bone_data_array:
-        print('Create Bone:%s, index = %d, parentIndex = %d, parentName:%s, position:%s, optional:%s' %
-              (bone_data[1], bone_data[0], bone_data[2], bone_data[3], bone_data[4], bone_data[5]))
 
+    print('\n[Info]Construct armature --> %s(bpy.context.object.data.edit_bones)\n' % (amt.name))
+
+    for bone_data in bone_data_array:
         # 键是骨骼名称字符串，值是骨骼索引
-        ob['bone_mapping'][str(bone_data[0])] = bone_data[1]	# 添加bone_mapping数据(str(骨骼索引),骨骼名称)
+        ob['bone_mapping'][str(bone_data[6])] = bone_data[1]	# 添加bone_mapping数据(str(骨骼number),骨骼名称)
 
         bone = amt.edit_bones.new(bone_data[1])
         bone.head = Vector(bone_data[4]) 
         bone.tail = Vector(bone_data[4]) + Vector((0 , 0.01, 0))
+
+        print('Create Bone:%s, index = %d, bone_num = %d, parentIndex = %d, parentName:%s, position:%s, rotation:%s' %
+              (bone_data[1], bone_data[0], bone_data[6], bone_data[2], bone_data[3], bone_data[4], bone_data[5]))
+    
 
     bones = amt.edit_bones
     for bone_data in bone_data_array:
@@ -52,14 +58,17 @@ def construct_armature(name, bone_data_array):			# bone_data =[boneIndex, boneNa
         else:
             bone.parent = None
 
-    print('bone_mapping')
+    # print('bone_mapping')
+    # for k, v in ob['bone_mapping'].items():
+    #     print('((%s)%s,(%s)%s)' % (str(type(k)), k, str(type(v)), v))
 
-    for k, v in ob['bone_mapping'].items():
-        print('((%s)%s,(%s)%s)' % (str(type(k)), k, str(type(v)), v))
+    # print('edit_bones')
+    # for k, v in bones.items():
+    #     print('((%s)%s,(%s)%s)' % (str(type(k)), k, str(type(v)), v.name))
 
-    print('bones')
-
-    for k, v in bones.items():
+    print('armature.pose.bones')
+    global ModelName
+    for k, v in bpy.data.objects.get(ModelName).pose.bones.items():
         print('((%s)%s,(%s)%s)' % (str(type(k)), k, str(type(v)), v.name))
 
     bpy.ops.object.mode_set(mode='OBJECT')
@@ -106,7 +115,7 @@ def construct_mesh(mesh_data):
     faces = mesh_data[2]
     has_bone = mesh_data[3]
     weight_infos = [[[],[]]]							# A real fan can recognize me even I am a 2 dimensional array
-    print("[+] importing %s" % name)
+    # print("[+] importing %s" % name)
     objmesh = bpy.data.meshes.new(name)
     if not name in bpy.data.objects.keys(): 
         obj = bpy.data.objects.new(name, objmesh)
@@ -143,7 +152,7 @@ def consturct_materials(texture_dir ,material):
     material_name = material[0]
     textures = material[1]
     uniforms = material[2]
-    print('[+] importing material %s' % material_name)
+    # print('[+] importing material %s' % material_name)
     material = bpy.data.materials.new( '%s' % (material_name))
     #print("\n".join(["%s:%f" %(key, uniforms[key]) for key in sorted(uniforms.keys())]))
     for key in uniforms.keys():
@@ -164,7 +173,7 @@ def consturct_materials(texture_dir ,material):
 
             if os.path.exists(texture_file):
                 if not texture_name in bpy.data.textures.keys():
-                    print('[+] importing texture %s' % texture_name)
+                    # print('[+] importing texture %s' % texture_name)
                     texture = bpy.data.textures.new('%s' % (texture_name), type = 'IMAGE')
                     texture.image = bpy.data.images.load(texture_file)
                 else:
@@ -190,7 +199,7 @@ def consturct_materials(texture_dir ,material):
                     material_textureslot.use_map_warp = True
                 else:
                     material_textureslot.use_map_color_diffuse = True
-                print('[+] adding texture %s to material %s' % (texture_name, material_name))
+                # print('[+] adding texture %s to material %s' % (texture_name, material_name))
                 material_textureslot.texture = texture
                 material_textureslot.texture_coords = 'UV'
         else:
@@ -201,7 +210,7 @@ def consturct_materials(texture_dir ,material):
 
 def add_material_to_mesh(mesh, materials , uvs):
     for material in materials:
-        print('linking material %s to mesh object %s' % (material.name, mesh.name))
+        # print('linking material %s to mesh object %s' % (material.name, mesh.name))
         mesh.data.materials.append(material)
     bpy.context.scene.objects.active = mesh
     bpy.ops.object.mode_set(mode="EDIT")
@@ -279,13 +288,18 @@ def get_wmb_material(wmb, texture_dir):
     return materials
 
 def main(wmb_file = os.path.split(os.path.realpath(__file__))[0] + '\\test\\pl0000.dtt\\pl0000.wmb'):
-    reset_blend()
+    # reset_blend()
     wmb = WMB3(wmb_file)
     wmbname = wmb_file.split('\\')[-1]
-    texture_dir = wmb_file.replace(wmbname, '') 
+    texture_dir = wmb_file.replace(wmbname, '')
+    global ModelName
+    ModelName = wmbname.replace('.wmb','')
+
     if wmb.hasBone:
         boneArray = [[bone.boneIndex, "bone%d"%bone.boneIndex, bone.parentIndex,"bone%d"%bone.parentIndex , bone.world_position, bone.world_rotation, bone.boneNumber] for bone in wmb.boneArray]
+        # boneArray = [[bone.boneIndex, "bone%d"%bone.boneNumber, bone.parentIndex,"bone%d"%bone.parentIndex , bone.world_position, bone.world_rotation, bone.boneNumber] for bone in wmb.boneArray]
         construct_armature(wmbname.replace('.wmb','') ,boneArray)
+
     meshes, uvs, usedVerticeIndexArrays = format_wmb_mesh(wmb)
     wmb_materials = get_wmb_material(wmb, texture_dir)
     materials = []
@@ -302,11 +316,18 @@ def main(wmb_file = os.path.split(os.path.realpath(__file__))[0] + '\\test\\pl00
             for i in range(len(usedVerticeIndexArrays[Index + mesh_start])):
                 VertexIndex = usedVerticeIndexArrays[Index + mesh_start][i]
                 uv.append( uvs[groupIndex][VertexIndex])
-            add_material_to_mesh(meshes[Index + mesh_start], [materials[materialIndex]], uv)
-    amt = bpy.data.objects.get(wmbname.replace('.wmb',''))
+            # TODO:fix some wmb files materialIndex may be out of range
+            if materialIndex < len(materials):
+                add_material_to_mesh(meshes[Index + mesh_start], 
+                    [materials[materialIndex]], uv)
+            else:
+                print("[Error] materialIndex out of materials range.")
+
+    amt = bpy.data.objects.get(ModelName)
     if wmb.hasBone:
         for mesh in meshes:
             set_partent(amt,mesh)
+
     return {'FINISHED'}
 
 if __name__ == '__main__':
