@@ -160,7 +160,11 @@ def import_action(motion, armature, motion_name, bind_pose, rotation_resample=Fa
         bone_name = bone_mapping.get(str(bone_id))
         if bone_name is None:
             continue
-        pose_bone = pose_bones[bone_name]
+        # pose_bone = pose_bones[bone_name]
+        pose_bone = pose_bones.get(bone_name)
+        if pose_bone is None:
+            print('[Warning] %s not found.' % (bone_name))
+            continue
         # location keyframes
         if loc is None:
             pose_bone.location = mathutils.Vector([0, 0, 0])
@@ -223,59 +227,92 @@ def align4(size):
     return size
 
 # something may be wrong
+# def euler2Rotation(roll, pitch, yaw):
+#     yawMatrix = numpy.matrix([
+#             [math.cos(yaw), -math.sin(yaw), 0],
+#             [math.sin(yaw), math.cos(yaw), 0],
+#             [0, 0, 1]
+#         ])
+#     yawMatrix = numpy.matrix([
+#             [math.cos(yaw), -math.sin(yaw), 0],
+#             [math.sin(yaw), math.cos(yaw), 0],
+#             [0, 0, 1]
+#         ])
+#     pitchMatrix = numpy.matrix([
+#             [math.cos(pitch), 0, math.sin(pitch)],
+#             [0, 1, 0],
+#             [-math.sin(pitch), 0, math.cos(pitch)]
+#         ])
+#     rollMatrix = numpy.matrix([
+#             [1, 0, 0],
+#             [0, math.cos(roll), -math.sin(roll)],
+#             [0, math.sin(roll), math.cos(roll)]
+#         ])
+
+#     R = yawMatrix * pitchMatrix * rollMatrix
+#     theta = math.acos(((R[0, 0] + R[1, 1] + R[2, 2]) - 1) / 2)
+#     multi = 0
+#     if theta != 0:
+#         multi = 1 / (2 * math.sin(theta))
+
+#     rx = multi * (R[2, 1] - R[1, 2]) * theta
+#     ry = multi * (R[0, 2] - R[2, 0]) * theta
+#     rz = multi * (R[1, 0] - R[0, 1]) * theta
+
+#     # print('input: %f,%f,%f' % (roll, pitch, yaw))
+#     # print('out: %f,%f,%f' % (rx, ry, rz))
+
+#     return rx, ry, rz, 1
+
 def euler2Rotation(roll, pitch, yaw):
-    yawMatrix = numpy.matrix([
-            [math.cos(yaw), -math.sin(yaw), 0],
-            [math.sin(yaw), math.cos(yaw), 0],
-            [0, 0, 1]
-        ])
-    yawMatrix = numpy.matrix([
-            [math.cos(yaw), -math.sin(yaw), 0],
-            [math.sin(yaw), math.cos(yaw), 0],
-            [0, 0, 1]
-        ])
-    pitchMatrix = numpy.matrix([
-            [math.cos(pitch), 0, math.sin(pitch)],
-            [0, 1, 0],
-            [-math.sin(pitch), 0, math.cos(pitch)]
-        ])
-    rollMatrix = numpy.matrix([
-            [1, 0, 0],
-            [0, math.cos(roll), -math.sin(roll)],
-            [0, math.sin(roll), math.cos(roll)]
-        ])
+    cy  =  math.cos(yaw * 0.5)
+    sy  =  math.sin(yaw * 0.5)
+    cr  =  math.cos(roll * 0.5)
+    sr  =  math.sin(roll * 0.5)
+    cp  =  math.cos(pitch * 0.5)
+    sp  =  math.sin(pitch * 0.5)
 
-    R = yawMatrix * pitchMatrix * rollMatrix
-    theta = math.acos(((R[0, 0] + R[1, 1] + R[2, 2]) - 1) / 2)
-    multi = 0
-    if theta != 0:
-        multi = 1 / (2 * math.sin(theta))
+    w  =  cy  *  cr  *  cp  +  sy  *  sr  *  sp
+    x  =  cy  *  sr  *  cp  -  sy  *  cr  *  sp
+    y  =  cy  *  cr  *  sp  +  sy  *  sr  *  cp
+    z  =  sy  *  cr *  cp  -  cy  *  sr  *  sp
 
-    rx = multi * (R[2, 1] - R[1, 2]) * theta
-    ry = multi * (R[0, 2] - R[2, 0]) * theta
-    rz = multi * (R[1, 0] - R[0, 1]) * theta
+    return x, y, z, w
 
-    # print('input: %f,%f,%f' % (roll, pitch, yaw))
-    # print('out: %f,%f,%f' % (rx, ry, rz))
-
-    return rx, ry, rz, 1
+def quaternion_to_euler_angle(w, x, y, z):
+    ysqr = y * y
+    
+    t0 = +2.0 * (w * x + y * z)
+    t1 = +1.0 - 2.0 * (x * x + ysqr)
+    X = math.degrees(math.atan2(t0, t1))
+    
+    t2 = +2.0 * (w * y - z * x)
+    t2 = +1.0 if t2 > +1.0 else t2
+    t2 = -1.0 if t2 < -1.0 else t2
+    Y = math.degrees(math.asin(t2))
+    
+    t3 = +2.0 * (w * z + x * y)
+    t4 = +1.0 - 2.0 * (ysqr + z * z)
+    Z = math.degrees(math.atan2(t3, t4))
+    
+    return X, Y, Z
 
 def calc_bind_pose_transforma(armature):
-	m = mathutils.Matrix()
-	m[0].xyzw = 1, 0, 0, 0
-	m[1].xyzw = 0, 0, 1, 0
-	m[2].xyzw = 0, -1, 0, 0
-	m[3].xyzw = 0, 0, 0, 1
+    m = mathutils.Matrix()
+    m[0].xyzw = 1, 0, 0, 0
+    m[1].xyzw = 0, 0, 1, 0
+    m[2].xyzw = 0, -1, 0, 0
+    m[3].xyzw = 0, 0, 0, 1
 
-	bind_pose = {}
-	for bone in armature.data.edit_bones:
-		if bone.parent is None:
-			loc_mat = m * bone.matrix
-		else:
-			loc_mat = (m * bone.parent.matrix).inverted() * (m * bone.matrix)
-		loc, rot, scale = loc_mat.decompose()
-		bind_pose[bone.name] = (loc, rot, scale)
-	return bind_pose
+    bind_pose = {}
+    for bone in armature.data.edit_bones:
+        if bone.parent is None:
+            loc_mat = m * bone.matrix
+        else:
+            loc_mat = (m * bone.parent.matrix).inverted() * (m * bone.matrix)
+        loc, rot, scale = loc_mat.decompose()
+        bind_pose[bone.name] = (loc, rot, scale)
+    return bind_pose
 
 def main(mot_file, armature):
     fp = open(mot_file, "rb")
