@@ -155,31 +155,48 @@ def import_action(motion, armature, motion_name, bind_pose, rotation_resample=Fa
     #
     bone_mapping = armature["bone_mapping"]
     pose_bones = armature.pose.bones
-    for bone_id, v in motion.items():
+    # pose_bones = armature.data.bones
+
+    print('[Info] armature.name: %s' % (armature.name))
+    print('[Info] armature.data.name: %s' % (armature.data.name))
+
+    # print('[Info]write motion to %s' % (str(type(pose_bones))))
+
+    # print('current pose_bones:')
+    # for k, v in pose_bones.items():
+    #     print('%s --> %s' % (k, str(type(v))))
+
+    used_bones = []
+
+    for bone_number, v in motion.items():
         loc, rot, scale = v
-        bone_name = bone_mapping.get(str(bone_id))
+        bone_name = bone_mapping.get(str(bone_number))
+
         if bone_name is None:
+            print('[Error] bone_number = %d not found in bone_mapping.' % (bone_number))
             continue
         # pose_bone = pose_bones[bone_name]
         pose_bone = pose_bones.get(bone_name)
         if pose_bone is None:
-            print('[Warning] %s not found.' % (bone_name))
+            print('[Error] %s not found in armature.pose.bones.' % (bone_name))
             continue
+
+        # Debug
+        if bone_name not in used_bones:
+            used_bones.append(bone_name);
+
         # location keyframes
-        if loc is None:
-            pose_bone.location = mathutils.Vector([0, 0, 0])
-            pose_bone.keyframe_insert("location", index=-1, frame=1)
-        else:
+        if loc is not None:
             for loc_k in loc:
                 f = loc_k[0] + 1
                 pose_bone.location = mathutils.Vector(loc_k[1:4])
                 pose_bone.location -= bind_pose[bone_name][0]
                 pose_bone.keyframe_insert("location", index=-1, frame=f)
-        # rotation keyframes
-        if rot is None:
-            pose_bone.rotation_quaternion = mathutils.Quaternion([1, 0, 0, 0])
-            pose_bone.keyframe_insert("rotation_quaternion", index=-1, frame=1)
         else:
+            pose_bone.location = mathutils.Vector([0, 0, 0])
+            pose_bone.keyframe_insert("location", index=-1, frame=1)
+        # rotation keyframes
+        if rot is not None:
             prev_f = 1
             for rot_k in rot:
                 f = rot_k[0] + 1
@@ -202,11 +219,11 @@ def import_action(motion, armature, motion_name, bind_pose, rotation_resample=Fa
                     pose_bone.rotation_quaternion = q
                     pose_bone.keyframe_insert("rotation_quaternion", index=-1, frame=f)
                 prev_f = f
-        # scale keyframes
-        if scale is None:
-            pose_bone.scale = mathutils.Vector([1, 1, 1])
-            pose_bone.keyframe_insert("scale", index=-1, frame=1)
         else:
+            pose_bone.rotation_quaternion = mathutils.Quaternion([1, 0, 0, 0])
+            pose_bone.keyframe_insert("rotation_quaternion", index=-1, frame=1)
+        # scale keyframes
+        if scale is not None:
             for scale_k in scale:
                 f = scale_k[0] + 1
                 pose_bone.scale = mathutils.Vector(scale_k[1:4])
@@ -214,6 +231,16 @@ def import_action(motion, armature, motion_name, bind_pose, rotation_resample=Fa
                 pose_bone.scale.y /= bind_pose[bone_name][2].y
                 pose_bone.scale.z /= bind_pose[bone_name][2].z
                 pose_bone.keyframe_insert("scale", index=-1, frame=f)
+        else:
+            pose_bone.scale = mathutils.Vector([1, 1, 1])
+            pose_bone.keyframe_insert("scale", index=-1, frame=1)
+
+    print('[Info] motion used bones:')
+    debuginfo = ''
+    for boneN in used_bones:
+        debuginfo += boneN + ', '
+    print(debuginfo)
+
     # force linear interpolation now
     for fcurve in action.fcurves:
         for keyframe_point in fcurve.keyframe_points:
@@ -304,8 +331,10 @@ def calc_bind_pose_transforma(armature):
     m[2].xyzw = 0, -1, 0, 0
     m[3].xyzw = 0, 0, 0, 1
 
+    # TODO:骨骼p,r,s数据计算可能不正确
     bind_pose = {}
     for bone in armature.data.edit_bones:
+        # print('calc %s' % (bone.name))
         if bone.parent is None:
             loc_mat = m * bone.matrix
         else:
