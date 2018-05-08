@@ -112,7 +112,7 @@ def read_motionData(frame_count, tracks):
             roty = bone_tracks[4][i]
             rotz = bone_tracks[5][i]
             # TODO: need to convert euler angles to quaternion
-            x, y, z, w = euler2Rotation(rotx, roty, rotz)
+            x, y, z, w = euler_angle_to_quaternion(rotx, roty, rotz)
             rot_frames.append((i, x, y, z, w))
             # rot_frames.append((i, rotx, roty, rotz, 1))
             # print(rot_frames)
@@ -264,7 +264,7 @@ def align4(size):
 
 #     return rx, ry, rz, 1
 
-def euler2Rotation(roll, pitch, yaw):
+def euler_angle_to_quaternion(roll, pitch, yaw):
     cy  =  math.cos(yaw * 0.5)
     sy  =  math.sin(yaw * 0.5)
     cr  =  math.cos(roll * 0.5)
