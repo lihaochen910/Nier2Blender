@@ -15,11 +15,14 @@ bl_info = {
 # if it's there, reload everything
 if "bpy" in locals():
     import importlib
-    if "gtb_importer" in locals():
+    if "wmb_importer" in locals():
         from nier2blender import wmb_importer
-        from nier2blender import mot_importer
         importlib.reload(wmb_importer)
+        print("[Info] reload <wmb_importer> module.")
+    if "mot_importer" in locals():
+        from nier2blender import mot_importer
         importlib.reload(mot_importer)
+        print("[Info] reload <mot_importer> module.")
 
 #just for Break
 
@@ -51,6 +54,7 @@ class ImportNierMotion2blender(bpy.types.Operator, ImportHelper):
         armature = None
         for obj in context.selected_objects:
             if obj.get("bone_mapping"):
+                print('[Info] Selected obj: %s' % (obj.name))
                 armature = obj
                 break
 
@@ -62,22 +66,36 @@ class ImportNierMotion2blender(bpy.types.Operator, ImportHelper):
         from nier2blender import mot_importer
         return mot_importer.main(self.filepath, armature)
 
-
 # Registration
-
 def menu_func_import(self, context):
     self.layout.operator(ImportNier2blender.bl_idname, text="WMB File for Nier: Automata (.wmb)")
     self.layout.operator(ImportNierMotion2blender.bl_idname,
                          text="MOT File for Nier: Automata (.mot)")
 
+# store keymaps here to access after registration
+addon_keymaps = []
 
 def register():
     bpy.utils.register_module(__name__)
     bpy.types.INFO_MT_file_import.append(menu_func_import)
 
+    # handle the keymap
+    wm = bpy.context.window_manager
+    km = wm.keyconfigs.addon.keymaps.new(name='Object Mode', space_type='EMPTY')
+    km_importWMB = km.keymap_items.new(ImportNier2blender.bl_idname, 'W', 'PRESS', ctrl=True, shift=True)
+    km_importMotion = km.keymap_items.new(ImportNierMotion2blender.bl_idname, 'M', 'PRESS', ctrl=True, shift=True)
+    addon_keymaps.append(km)
+
 def unregister():
     bpy.utils.unregister_module(__name__)
     bpy.types.INFO_MT_file_import.remove(menu_func_import)
+
+    # handle the keymap
+    wm = bpy.context.window_manager
+    for km in addon_keymaps:
+        wm.keyconfigs.addon.keymaps.remove(km)
+    # clear the list
+    del addon_keymaps[:]
 
 
 if __name__ == '__main__':
