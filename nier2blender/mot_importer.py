@@ -88,11 +88,18 @@ def read_motionData(frame_count, tracks):
         bone_tracks = evaluated_tracks.setdefault(track.bone_id, [None] * 9)
         # print('bone_id:%d' % (track.bone_id))
         # Some mot file have unknown track type: 14,15
-        if track.type >= 0 and track.type <= 9:
+        if 0 <= track.type <= 5:    # 0-5 index no change
+            # print('[Info] 0-5 TrackType:%d' % (track.type))
             frames = []
             for i in range(frame_count):
                 frames.append(track.eval(i))
             bone_tracks[track.type] = frames
+        elif 7 <= track.type <= 9:      # 7-9 index need to (-1), because TrackType:6 skipped.
+            # print('[Info] 7-9 TrackType:%d' % (track.type))
+            frames = []
+            for i in range(frame_count):
+                frames.append(track.eval(i))
+            bone_tracks[track.type - 1] = frames
         else:
             print('[Error] Unknown TrackType:%d' % (track.type))
 
@@ -143,6 +150,9 @@ def import_action(motion, armature, motion_name, bind_pose, rotation_resample=Fa
     if armature.animation_data is None:
         armature.animation_data_create()
     armature.animation_data.action = action
+
+    bpy.context.scene.objects.active = armature
+    bpy.ops.object.mode_set(mode='POSE')
     # This dictionary maps 'bone_id' to 'bone_name'.
     # In DMC4SE, bone_name is made up as "Bone" + str(bone_index), so 'bone_mapping' acts just
     # like a 'bone_id' to 'bone_index' mapping.
@@ -250,50 +260,14 @@ def import_action(motion, armature, motion_name, bind_pose, rotation_resample=Fa
         for keyframe_point in fcurve.keyframe_points:
             keyframe_point.interpolation = 'LINEAR'
 
+    bpy.ops.object.mode_set(mode='OBJECT')
+
 def align4(size):
     """align to 4 bytes"""
     rem = size % 4
     if rem:
         size += 4 - rem
     return size
-
-# something may be wrong
-# def euler2Rotation(roll, pitch, yaw):
-#     yawMatrix = numpy.matrix([
-#             [math.cos(yaw), -math.sin(yaw), 0],
-#             [math.sin(yaw), math.cos(yaw), 0],
-#             [0, 0, 1]
-#         ])
-#     yawMatrix = numpy.matrix([
-#             [math.cos(yaw), -math.sin(yaw), 0],
-#             [math.sin(yaw), math.cos(yaw), 0],
-#             [0, 0, 1]
-#         ])
-#     pitchMatrix = numpy.matrix([
-#             [math.cos(pitch), 0, math.sin(pitch)],
-#             [0, 1, 0],
-#             [-math.sin(pitch), 0, math.cos(pitch)]
-#         ])
-#     rollMatrix = numpy.matrix([
-#             [1, 0, 0],
-#             [0, math.cos(roll), -math.sin(roll)],
-#             [0, math.sin(roll), math.cos(roll)]
-#         ])
-
-#     R = yawMatrix * pitchMatrix * rollMatrix
-#     theta = math.acos(((R[0, 0] + R[1, 1] + R[2, 2]) - 1) / 2)
-#     multi = 0
-#     if theta != 0:
-#         multi = 1 / (2 * math.sin(theta))
-
-#     rx = multi * (R[2, 1] - R[1, 2]) * theta
-#     ry = multi * (R[0, 2] - R[2, 0]) * theta
-#     rz = multi * (R[1, 0] - R[0, 1]) * theta
-
-#     # print('input: %f,%f,%f' % (roll, pitch, yaw))
-#     # print('out: %f,%f,%f' % (rx, ry, rz))
-
-#     return rx, ry, rz, 1
 
 def euler_angle_to_quaternion(roll, pitch, yaw):
     cy  =  math.cos(yaw * 0.5)
