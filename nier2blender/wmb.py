@@ -173,6 +173,10 @@ class wmb3_bone(object):
 		self.world_rotation = (world_rotationX, world_rotationY, world_rotationZ)
 
 		self.world_position_tpose = (world_position_tposeX, world_position_tposeY, world_position_tposeZ)
+
+		# add useful custom property
+		self.boneName = 'bone%d_(%d)' % (self.boneIndex, self.boneNumber)
+		self.parentName = None
 class wmb3_boneMap(object):
 	"""docstring for wmb3_boneMap"""
 	def __init__(self, wmb_fp):
@@ -317,9 +321,15 @@ class WMB3(object):
 			self.hasBone = True
 		print_class(self.wmb3_header)
 		wmb_fp.seek(self.wmb3_header.boneArrayOffset)
+
 		self.boneArray = []
 		for boneIndex in range(self.wmb3_header.boneCount):
 			self.boneArray.append(wmb3_bone(wmb_fp,boneIndex))
+
+		# init useful custom property
+		for bone in self.boneArray:
+			if bone.parentIndex != -1 and bone.parentIndex != 0xffff:
+				bone.parentName = self.boneArray[bone.parentIndex].boneName
 
 		wmb_fp.seek(self.wmb3_header.unknownChunk1Offset)
 		unknownData1Array = []
