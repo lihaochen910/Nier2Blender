@@ -20,7 +20,7 @@ def reset_blend():
         bpy.data.objects.remove(obj)
         obj.user_clear()
 
-def construct_armature(name, bone_data_array):			# bone_data =[boneIndex, boneName, parentIndex, parentName, bone_pos, bone_rot, bone_number ]
+def construct_armature(name, wmb_bone_array):			# bone_data =[boneIndex, boneName, parentIndex, parentName, bone_pos, bone_rot, bone_number ]
     print('[+] importing armature')
     bpy.ops.object.add(
         type='ARMATURE', 
@@ -37,34 +37,35 @@ def construct_armature(name, bone_data_array):			# bone_data =[boneIndex, boneNa
 
     print('\n[Info]Construct armature --> %s(bpy.context.object.data.edit_bones)\n' % (amt.name))
 
-    for bone_data in bone_data_array:
+    for wmb_bone in wmb_bone_array:
         # 键是骨骼名称字符串，值是骨骼索引
-        ob['bone_mapping'][str(bone_data[6])] = bone_data[1]	# 添加bone_mapping数据(str(骨骼number),骨骼名称)
+        # 添加bone_mapping数据(str(骨骼number),骨骼名称)
+        ob['bone_mapping'][str(wmb_bone.boneNumber)] = wmb_bone.boneIndex
 
-        bone = amt.edit_bones.new(bone_data[1])
-        bone.head = Vector(bone_data[4]) 
-        bone.tail = Vector(bone_data[4]) + Vector((0 , 0.01, 0))
+        bone = amt.edit_bones.new(wmb_bone.boneName)
+        # NOTE: bone.head/bone.tail is float* type.
+        bone.head = Vector(wmb_bone.world_position)
+        bone.tail = Vector(wmb_bone.world_position) + Vector((0 , 0.01, 0))
 
         print('Create Bone:%s, index = %d, bone_num = %d, parentIndex = %d, parentName:%s, position:%s, rotation:%s' %
-              (bone_data[1], bone_data[0], bone_data[6], bone_data[2], bone_data[3], bone_data[4], bone_data[5]))
+              (wmb_bone.boneName, wmb_bone.boneIndex, wmb_bone.boneNumber, wmb_bone.parentIndex, wmb_bone.parentName, wmb_bone.world_position, wmb_bone.world_rotation))
     
 
     bones = amt.edit_bones
-    for bone_data in bone_data_array:
-        if bone_data[2] < 0xffff:						#this value need to edit in different games
-            bone = bones[bone_data[1]]
-            bone.parent = bones[bone_data[3]]
-            bones[bone_data[3]].tail = bone.head
+    # TODO: 检查bone.head是否重复赋值
+    for wmb_bone in wmb_bone_array:
+        if wmb_bone.parentIndex != 0xffff and wmb_bone.parentIndex != -1:  # this value need to edit in different games
+            bone = bones[wmb_bone.boneName]
+            
+            bone.parent = bones[wmb_bone.parentName]
+
+            # bone.head = bone.parent.tail
+            # if bones[wmb_bone.parentName].tail != Vector(wmb_bone.world_position) + Vector((0, 0.01, 0)):
+            #     bones[wmb_bone.parentName].tail = bone.head
+
+            # bones[bone_data[3]].tail = bone.head
         else:
             bone.parent = None
-
-    # print('bone_mapping')
-    # for k, v in ob['bone_mapping'].items():
-    #     print('((%s)%s,(%s)%s)' % (str(type(k)), k, str(type(v)), v))
-
-    # print('edit_bones')
-    # for k, v in bones.items():
-    #     print('((%s)%s,(%s)%s)' % (str(type(k)), k, str(type(v)), v.name))
 
     print('armature.pose.bones')
     global ModelName
@@ -296,9 +297,8 @@ def main(wmb_file = os.path.split(os.path.realpath(__file__))[0] + '\\test\\pl00
     ModelName = wmbname.replace('.wmb','')
 
     if wmb.hasBone:
-        boneArray = [[bone.boneIndex, "bone%d"%bone.boneIndex, bone.parentIndex,"bone%d"%bone.parentIndex , bone.world_position, bone.world_rotation, bone.boneNumber] for bone in wmb.boneArray]
-        # boneArray = [[bone.boneIndex, "bone%d"%bone.boneNumber, bone.parentIndex,"bone%d"%bone.parentIndex , bone.world_position, bone.world_rotation, bone.boneNumber] for bone in wmb.boneArray]
-        construct_armature(wmbname.replace('.wmb','') ,boneArray)
+        # boneArray = [[bone.boneIndex, bone.boneName, bone.parentIndex, bone.parentName, bone.world_position, bone.world_rotation, bone.boneNumber] for bone in wmb.boneArray]
+        construct_armature(wmbname.replace('.wmb', ''), wmb.boneArray)
 
     meshes, uvs, usedVerticeIndexArrays = format_wmb_mesh(wmb)
     wmb_materials = get_wmb_material(wmb, texture_dir)
