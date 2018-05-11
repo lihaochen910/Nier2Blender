@@ -40,10 +40,10 @@ def construct_armature(name, wmb_bone_array):			# bone_data =[boneIndex, boneNam
     for wmb_bone in wmb_bone_array:
         # 键是骨骼名称字符串，值是骨骼索引
         # 添加bone_mapping数据(str(骨骼number),骨骼名称)
-        ob['bone_mapping'][str(wmb_bone.boneNumber)] = wmb_bone.boneIndex
+        ob['bone_mapping'][str(wmb_bone.boneNumber)] = wmb_bone.boneName
 
         bone = amt.edit_bones.new(wmb_bone.boneName)
-        # NOTE: bone.head/bone.tail is float* type.
+
         bone.head = Vector(wmb_bone.world_position)
         bone.tail = Vector(wmb_bone.world_position) + Vector((0 , 0.01, 0))
 
@@ -52,14 +52,14 @@ def construct_armature(name, wmb_bone_array):			# bone_data =[boneIndex, boneNam
     
 
     bones = amt.edit_bones
-    # TODO: 检查bone.head是否重复赋值
+    
     for wmb_bone in wmb_bone_array:
         if wmb_bone.parentIndex != 0xffff and wmb_bone.parentIndex != -1:  # this value need to edit in different games
             bone = bones[wmb_bone.boneName]
             
             bone.parent = bones[wmb_bone.parentName]
 
-            # bone.head = bone.parent.tail
+            bone.head = bone.parent.tail
             # if bones[wmb_bone.parentName].tail != Vector(wmb_bone.world_position) + Vector((0, 0.01, 0)):
             #     bones[wmb_bone.parentName].tail = bone.head
 
@@ -67,10 +67,19 @@ def construct_armature(name, wmb_bone_array):			# bone_data =[boneIndex, boneNam
         else:
             bone.parent = None
 
-    print('armature.pose.bones')
-    global ModelName
-    for k, v in bpy.data.objects.get(ModelName).pose.bones.items():
-        print('((%s)%s,(%s)%s)' % (str(type(k)), k, str(type(v)), v.name))
+    # check bone length
+    for bone in bones:
+        if bone.head == bone.tail:
+            print("[Warning] %s's length == 0"%bone.name)
+            if len(bone.children) > 0:
+                print("[Info] try to fix %s's length"%bone.name)
+                bone.tail = bone.children[0].head
+                if bone.head == bone.tail:
+                    print("[Info] use custom length: 0.01")
+                    bone.tail = bone.head + Vector((0, 0.01, 0))
+            else:
+                print("[Info] use custom length: 0.01")
+                bone.tail = bone.head + Vector((0, 0.01, 0))
 
     bpy.ops.object.mode_set(mode='OBJECT')
     ob.rotation_euler = (math.tan(1),0,0)
